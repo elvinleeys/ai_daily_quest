@@ -102,6 +102,58 @@ def weather(lat, lon):
     return {'temp': round(float(obs['T1H'])), 'kind': kind}
 
 
+# ---------- Gemini 프록시: 키는 .env(GEMINI_API_KEY)에만 두고 브라우저로 보내지 않는다 ----------
+GEMINI_KEY = os.environ.get('GEMINI_API_KEY')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+MAX_AI_BODY = 20_000
+CATS = ('health', 'study', 'tidy', 'mind', 'social')
+DIFFS = ('easy', 'normal', 'hard')
+
+
+def gemini(prompt, as_json):
+    cfg = {'temperature': 0.9, **({'responseMimeType': 'application/json'} if as_json else {})}
+    req = urllib.request.Request(
+        f'https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent', method='POST',
+        data=json.dumps({'contents': [{'parts': [{'text': prompt}]}], 'generationConfig': cfg}).encode(),
+        headers={'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_KEY})
+    with urllib.request.urlopen(req, timeout=20) as res:
+        data = json.load(res)
+    return ''.join(p.get('text', '') for p in data['candidates'][0]['content']['parts']).strip()
+
+
+def clip(v, n=60):
+    return str(v or '')[:n]
+
+
+def ai_quests(b):
+    """프롬프트는 서버에서 만든다 (브라우저가 임의 프롬프트로 키를 쓰지 못하게)"""
+    diff = b.get('difficulty') if b.get('difficulty') in DIFFS else 'normal'
+    w = b.get('weather') or {}
+    h = b.get('history') or {}
+    weather_txt = f"{clip(w.get('kind'), 4)}, {clip(w.get('temp'), 4)}도" if w else '모름'
+    prompt = f"""너는 일상을 게임 퀘스트로 바꿔 주는 코치야.
+조건:
+- 오늘 퀘스트 4개를 한국어로 만든다. 각 퀘스트는 30분 안에 끝낼 수 있는 구체적인 행동 하나.
+- 난이도 기본값: {diff} (easy/normal/hard). 4개 중 1개는 한 단계 쉬운 것으로 섞는다.
+- 오늘 집중 목표: {clip(b.get('goal'), 100) or '없음'} → 최소 2개는 이 목표와 연결한다.
+- 날씨: {weather_txt} → 비/눈이면 실내 활동으로.
+- 최근 자주 완료한 분야: {', '.join(map(clip, h.get('topCats') or [])[:5]) or '없음'}, 자주 못 한 분야: {', '.join(map(clip, h.get('weakCats') or [])[:5]) or '없음'}
+- category는 {', '.join(CATS)} 중 하나.
+JSON 배열만 출력: [{{"title":"...","category":"...","difficulty":"easy|normal|hard"}}]"""
+    arr = json.loads(gemini(prompt, True))
+    quests = [{'title': clip(q.get('title'), 80), 'category': q.get('category'), 'difficulty': q.get('difficulty')}
+              for q in arr[:5] if isinstance(q, dict) and q.get('title')]
+    if not quests:
+        raise ValueError('빈 응답')
+    return {'quests': quests}
+
+
+def ai_comment(b):
+    summary = json.dumps(b.get('summary') or {}, ensure_ascii=False)[:4000]
+    text = gemini(f'다음은 사용자의 지난 7일 퀘스트 기록이야. 칭찬 1문장 + 다음 주 제안 1문장, 총 2문장으로 따뜻하게 한국어로 써 줘.\n{summary}', False)
+    return {'text': text[:500]}
+
+
 class Handler(BaseHTTPRequestHandler):
     def send(self, code, body=b'', ctype='application/json', cookie=None):
         self.send_response(code)
@@ -119,8 +171,28 @@ class Handler(BaseHTTPRequestHandler):
                 return v, False
         return uuid.uuid4().hex, True
 
+    def ai(self, path):
+        """POST /api/quests, /api/comment → Gemini. 키가 없으면 503 (브라우저는 기본 퀘스트로 대체)"""
+        if not GEMINI_KEY:
+            return self.send(503, b'{"error":"GEMINI_API_KEY not set"}')
+        try:
+            n = int(self.headers.get('Content-Length', 0))
+            if n > MAX_AI_BODY:
+                return self.send(413)
+            body = json.loads(self.rfile.read(n) or '{}')
+            if not isinstance(body, dict):
+                return self.send(400)
+            out = ai_quests(body) if path == '/api/quests' else ai_comment(body)
+            self.send(200, json.dumps(out, ensure_ascii=False).encode())
+        except Exception as e:
+            print('gemini 실패:', e)
+            self.send(502)
+
     def do_POST(self):
-        if urllib.parse.urlparse(self.path).path != '/api/state' or not (SB_URL and SB_KEY):
+        path = urllib.parse.urlparse(self.path).path
+        if path in ('/api/quests', '/api/comment'):
+            return self.ai(path)
+        if path != '/api/state' or not (SB_URL and SB_KEY):
             return self.send(404)
         uid, _ = self.uid()
         try:
