@@ -1,0 +1,1051 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 데일리 퀘스트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Silkscreen&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0c0a14;
+    --panel: #17131f;
+    --panel-2: #221c2e;
+    --line: #3a2f45;
+    --text: #f4ecdc;
+    --muted: #a99c8a;
+    --gold: #f5c04a;
+    --gold-2: #ffe08a;
+    --gold-dark: #8a6420;
+    --red: #e5484d;
+    --good: #5fd38d;
+    --easy: #5fd38d;
+    --normal: #6cb6ff;
+    --hard: #ff7aa2;
+    --radius: 16px;
+    --pixel: "Silkscreen", ui-monospace, monospace;
+    --display: "Black Han Sans", "Pretendard", sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { overflow-x: hidden; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Pretendard", -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    line-height: 1.5;
+  }
+  button { font: inherit; cursor: pointer; color: inherit; }
+  input { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; }
+  input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .shell { max-width: 480px; margin: 0 auto; position: relative; }
+
+  /* ============ 히어로: 배경 일러스트 + 캐릭터 ============ */
+  .hero { position: relative; height: 400px; overflow: hidden; }
+  .scene { position: absolute; inset: 0; }
+  .scene svg.bg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .scene .sky { transition: opacity 1.4s ease; opacity: 0; }
+  .phase-morning .sky-m, .phase-day .sky-d, .phase-night .sky-n { opacity: 1; }
+  .scene .m1, .scene .m2, .scene .hill, .scene .castle, .scene .tree { transition: fill 1.4s ease; }
+  .phase-morning { --m1: #7a5a86; --m2: #4d3763; --hill: #261b36; --castle: #33264a; --tree: #1c1428; }
+  .phase-day     { --m1: #8fb3cf; --m2: #5f8fae; --hill: #2f6150; --castle: #46647e; --tree: #224a3b; }
+  .phase-night   { --m1: #2c2856; --m2: #1e1a41; --hill: #100e24; --castle: #1a1631; --tree: #0b0a1a; }
+  .m1 { fill: var(--m1); } .m2 { fill: var(--m2); } .hill { fill: var(--hill); } .castle { fill: var(--castle); } .tree { fill: var(--tree); }
+  .win { fill: #ffd27a; transition: opacity 1.4s; opacity: 0; }
+  .phase-night .win { opacity: 1; } .phase-morning .win { opacity: .5; }
+  .sun { transition: transform 1.4s ease, opacity 1.4s; transform-box: fill-box; transform-origin: center; }
+  .phase-morning .sun { transform: translateY(70px); fill: #ffb06b; }
+  .phase-day .sun { transform: translateY(0); fill: #fff3b0; }
+  .phase-night .sun { transform: translateY(160px); opacity: 0; }
+  .moon { transition: opacity 1.4s, transform 1.4s; opacity: 0; transform: translateY(40px); }
+  .phase-night .moon { opacity: 1; transform: translateY(0); }
+  .stars circle { opacity: 0; transition: opacity 1.4s; }
+  .phase-night .stars circle { opacity: 1; animation: twinkle var(--tw, 3s) ease-in-out infinite; }
+  @keyframes twinkle { 50% { opacity: .2; } }
+
+  .lanterns, .clouds, .precip { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .lantern {
+    position: absolute; bottom: -30px; width: 10px; height: 14px; border-radius: 4px 4px 6px 6px;
+    background: linear-gradient(#ffd98a, #ff9a3d); box-shadow: 0 0 12px 4px #ffae4d88;
+    animation: rise var(--d) linear var(--delay) infinite; opacity: 0; transition: opacity 1.4s;
+  }
+  .phase-night .lantern { opacity: .95; } .phase-morning .lantern { opacity: .55; }
+  @keyframes rise {
+    0% { transform: translate(0, 0) scale(var(--s)); }
+    50% { transform: translate(14px, -220px) scale(var(--s)); }
+    100% { transform: translate(-6px, -460px) scale(calc(var(--s) * .6)); }
+  }
+  .cloud { position: absolute; width: 90px; height: 28px; background: #fff; border-radius: 30px; opacity: 0; transition: opacity 1.4s; animation: drift var(--d) linear infinite; filter: blur(.3px); }
+  .cloud::before, .cloud::after { content: ""; position: absolute; background: inherit; border-radius: 50%; }
+  .cloud::before { width: 40px; height: 40px; left: 14px; top: -20px; }
+  .cloud::after { width: 30px; height: 30px; left: 44px; top: -12px; }
+  .phase-day .cloud { opacity: .85; } .phase-morning .cloud { opacity: .25; }
+  @keyframes drift { from { transform: translateX(-120px); } to { transform: translateX(560px); } }
+  .drop { position: absolute; top: -20px; width: 1.5px; height: 14px; background: #bcd7ff99; animation: fall var(--d) linear var(--delay) infinite; }
+  .flake { position: absolute; top: -10px; width: 5px; height: 5px; border-radius: 50%; background: #fff; opacity: .85; animation: fall var(--d) linear var(--delay) infinite; }
+  @keyframes fall { to { transform: translate(-20px, 440px); } }
+
+  .hero::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 140px; background: linear-gradient(transparent, var(--bg)); pointer-events: none; }
+  .hero-top { position: absolute; top: 12px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: center; z-index: 3; gap: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 99px; background: #0c0a14aa; backdrop-filter: blur(6px); font-size: 12px; border: 1px solid #ffffff22; white-space: nowrap; }
+  .icon-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid #ffffff22; background: #0c0a14aa; backdrop-filter: blur(6px); display: grid; place-items: center; font-size: 16px; }
+
+  .hero-center { position: absolute; left: 0; right: 0; top: 56px; z-index: 2; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .portrait-wrap { position: relative; cursor: pointer; animation: breathe 3.2s ease-in-out infinite; }
+  .portrait-wrap.jump { animation: jump .5s ease; }
+  @keyframes breathe { 50% { transform: translateY(-4px); } }
+  @keyframes jump { 30% { transform: translateY(-18px) scale(1.05); } 60% { transform: translateY(0) scale(.97); } }
+  .portrait {
+    width: 128px; height: 128px; border-radius: 50%; overflow: hidden;
+    border: 3px solid var(--gold);
+    background: radial-gradient(circle at 50% 30%, #fff1d2, #d8a868 70%, #9b6a35);
+    box-shadow: 0 0 0 6px #f5c04a22, 0 0 40px #f5c04a55;
+  }
+  .portrait svg { width: 100%; height: 100%; display: block; }
+  .stage-4 .portrait { box-shadow: 0 0 0 6px #f5c04a44, 0 0 60px #ffd25acc; }
+  .lv-badge { position: absolute; right: -4px; bottom: 4px; width: 38px; height: 38px; border-radius: 50%; background: #1b1424; border: 2px solid var(--gold); display: grid; place-items: center; font-family: var(--pixel); font-size: 14px; color: var(--gold-2); }
+  .bubble { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%) scale(.6); opacity: 0; transition: .25s; background: #fff7e6; color: #2a1d10; font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 12px; white-space: nowrap; pointer-events: none; }
+  .bubble::after { content: ""; position: absolute; left: 50%; top: 100%; transform: translateX(-50%); border: 6px solid transparent; border-top-color: #fff7e6; }
+  .bubble.show { opacity: 1; transform: translateX(-50%) scale(1); }
+  .pix { font-family: var(--pixel); letter-spacing: .08em; text-transform: uppercase; }
+  .hero-name { font-family: var(--display); font-size: 24px; margin-top: 12px; text-shadow: 0 2px 10px #000a; }
+  .hero-name em { font-style: normal; color: var(--gold); }
+  .hero-sub { font-size: 11px; color: #f4ecdccc; margin-top: 2px; text-shadow: 0 1px 4px #000; }
+  .xpbar { width: 220px; height: 12px; border-radius: 99px; background: #0008; border: 1px solid #f5c04a55; overflow: hidden; margin-top: 8px; }
+  .xpbar i { display: block; height: 100%; background: linear-gradient(90deg, #d9962a, var(--gold-2)); transition: width .6s cubic-bezier(.3,1.4,.5,1); box-shadow: 0 0 10px #ffd25a; }
+  .xpbar.pulse { animation: pulse .4s; }
+  @keyframes pulse { 50% { transform: scale(1.06); } }
+  .streak { margin-top: 10px; }
+  .streak b { color: var(--gold); }
+
+  /* ============ 본문 ============ */
+  main { padding: 0 16px 110px; margin-top: -24px; position: relative; z-index: 4; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .between { justify-content: space-between; }
+  .muted { color: var(--muted); font-size: 13px; }
+  h2 { font-family: var(--display); font-weight: 400; font-size: 18px; margin: 0 0 10px; }
+  .eyebrow { display: inline-block; font-family: var(--pixel); font-size: 10px; color: var(--gold); border: 1px solid var(--gold-dark); padding: 2px 10px; border-radius: 99px; margin-bottom: 8px; }
+  .stack > * + * { margin-top: 10px; }
+  .hidden { display: none !important; }
+
+  /* 보스 */
+  .boss { display: flex; gap: 14px; align-items: center; background: linear-gradient(135deg, #2a1220, #17131f); border-color: #5a2433; }
+  .boss-art { width: 84px; height: 84px; flex: none; position: relative; cursor: pointer; }
+  .boss-art svg { width: 100%; height: 100%; animation: bob 2.4s ease-in-out infinite; filter: drop-shadow(0 6px 6px #0008); }
+  .boss-art.hit svg { animation: hit .4s; }
+  .boss.defeated .boss-art svg { filter: grayscale(1) brightness(.5); animation: none; transform: rotate(90deg) translateX(10px); }
+  @keyframes bob { 50% { transform: translateY(-4px) scaleY(1.03); } }
+  @keyframes hit { 20% { transform: translateX(-6px) rotate(-6deg); filter: brightness(2.5); } 60% { transform: translateX(5px) rotate(4deg); } }
+  .boss-info { flex: 1; min-width: 0; }
+  .boss-name { font-family: var(--display); font-size: 17px; }
+  .hpbar { height: 10px; border-radius: 99px; background: #0008; border: 1px solid #e5484d55; overflow: hidden; margin: 6px 0 4px; }
+  .hpbar i { display: block; height: 100%; background: linear-gradient(90deg, #b3242d, #ff6b6b); transition: width .5s ease; }
+
+  /* 버튼 */
+  .btn { border: 0; border-radius: 14px; padding: 13px 16px; font-weight: 800; width: 100%; }
+  .btn-primary { background: linear-gradient(180deg, var(--gold-2), var(--gold) 60%, #d99a2b); color: #2a1a05; box-shadow: 0 4px 0 #8a5d17, 0 0 24px #f5c04a44; transition: transform .1s, box-shadow .1s; }
+  .btn-primary:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #8a5d17; }
+  .btn-primary:disabled { filter: grayscale(.8) brightness(.6); cursor: default; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .seg button { background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); border-radius: 12px; padding: 10px 0; font-weight: 700; transition: .15s; }
+  .seg button.on[data-d=easy] { color: var(--easy); border-color: var(--easy); background: #5fd38d1a; }
+  .seg button.on[data-d=normal] { color: var(--normal); border-color: var(--normal); background: #6cb6ff1a; }
+  .seg button.on[data-d=hard] { color: var(--hard); border-color: var(--hard); background: #ff7aa21a; }
+  .notice { padding: 10px 12px; border-radius: 12px; background: #f5c04a14; border: 1px solid #f5c04a33; font-size: 13px; }
+  .notice a { color: var(--gold-2); }
+
+  /* 퀘스트 카드 */
+  .quest { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 14px; background: var(--panel-2); margin-bottom: 8px; border: 1px solid var(--line); border-left: 4px solid var(--c); transition: .25s; position: relative; }
+  .quest[data-d=easy] { --c: var(--easy); } .quest[data-d=normal] { --c: var(--normal); } .quest[data-d=hard] { --c: var(--hard); }
+  .quest.done { background: linear-gradient(90deg, #f5c04a1f, var(--panel-2)); border-color: #f5c04a55; border-left-color: var(--gold); }
+  .quest.done .q-title { text-decoration: line-through; color: var(--muted); }
+  .deal .quest { animation: deal .5s cubic-bezier(.2,1.4,.5,1) backwards; }
+  .deal .quest:nth-child(2) { animation-delay: .08s; } .deal .quest:nth-child(3) { animation-delay: .16s; } .deal .quest:nth-child(4) { animation-delay: .24s; } .deal .quest:nth-child(5) { animation-delay: .32s; }
+  @keyframes deal { from { opacity: 0; transform: translateY(30px) rotate(-3deg) scale(.9); } }
+  .q-icon { width: 40px; height: 40px; flex: none; border-radius: 12px; background: #0005; display: grid; place-items: center; font-size: 20px; }
+  .q-body { flex: 1; min-width: 0; }
+  .q-title { font-weight: 700; word-break: keep-all; }
+  .q-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .tag { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: #0005; color: var(--muted); }
+  .tag.d { color: var(--c); }
+  .tag.xp { color: var(--gold); font-family: var(--pixel); }
+  .check { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--gold-dark); background: #0004; font-size: 18px; transition: .2s; }
+  .check:hover { border-color: var(--gold); transform: scale(1.06); }
+  .quest.done .check { background: radial-gradient(circle, var(--gold-2), var(--gold)); border-color: var(--gold); color: #2a1a05; }
+  .q-swap { background: none; border: 0; color: var(--muted); font-size: 16px; padding: 4px; position: absolute; top: 4px; right: 60px; }
+  .q-swap:hover { color: var(--gold); transform: rotate(180deg); transition: .3s; }
+  .combo { position: absolute; right: 12px; top: -10px; font-family: var(--pixel); font-size: 11px; background: var(--red); color: #fff; padding: 1px 8px; border-radius: 6px; }
+
+  /* 보상 상자 */
+  .chest-wrap { display: grid; place-items: center; padding: 6px 0; }
+  .chest { width: 150px; cursor: pointer; transition: transform .2s; }
+  .chest:not(.open):not(.locked):hover { transform: scale(1.05) rotate(-2deg); }
+  .chest:not(.open):not(.locked) { animation: wiggle 2.4s ease-in-out infinite; }
+  @keyframes wiggle { 0%, 80%, 100% { transform: rotate(0); } 85% { transform: rotate(-4deg); } 90% { transform: rotate(4deg); } 95% { transform: rotate(-2deg); } }
+  .chest .lid { transition: transform .5s cubic-bezier(.3,1.6,.5,1); transform-box: fill-box; transform-origin: 0% 100%; }
+  .chest.open .lid { transform: rotate(-35deg) translate(-6px, -10px); }
+  .chest .glow { opacity: 0; transition: opacity .5s; }
+  .chest.open .glow { opacity: 1; }
+  .chest.locked { filter: grayscale(.7) brightness(.6); cursor: default; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat { background: var(--panel-2); border-radius: 12px; padding: 10px 4px; text-align: center; }
+  .stat b { display: block; font-family: var(--pixel); font-size: 18px; color: var(--gold-2); }
+
+  /* 리포트 */
+  .bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end; height: 120px; margin-top: 8px; }
+  .bars .col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; }
+  .bars .col i { width: 100%; max-width: 26px; border-radius: 6px 6px 2px 2px; background: #6b5a8a; min-height: 3px; transition: height .6s; }
+  .bars .col.today i { background: var(--gold); box-shadow: 0 0 10px #f5c04a88; }
+  .bars .col span { font-size: 11px; color: var(--muted); }
+  .bar { height: 8px; background: #0006; border-radius: 99px; overflow: hidden; margin-top: 4px; }
+  .bar > i { display: block; height: 100%; background: var(--gold); border-radius: 99px; transition: width .6s; }
+  .evo { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .evo div { text-align: center; }
+  .evo .mini { width: 100%; aspect-ratio: 1; border-radius: 50%; overflow: hidden; border: 2px solid var(--line); background: radial-gradient(circle at 50% 30%, #fff1d2, #d8a868 70%, #9b6a35); }
+  .evo .mini svg { width: 100%; height: 100%; display: block; }
+  .evo .lock .mini { filter: brightness(0) opacity(.5); background: #555; }
+  .evo .cur .mini { border-color: var(--gold); box-shadow: 0 0 12px #f5c04a88; }
+  .evo span { display: block; font-family: var(--pixel); font-size: 9px; color: var(--muted); margin-top: 4px; }
+  .evo .cur span { color: var(--gold); }
+
+  /* 하단 탭 */
+  .nav { position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; width: 100%; max-width: 480px; z-index: 20; display: grid; grid-template-columns: repeat(4, 1fr); background: #0c0a14ee; backdrop-filter: blur(10px); border-top: 1px solid var(--line); padding: 6px 8px calc(8px + env(safe-area-inset-bottom)); }
+  .nav button { background: none; border: 0; color: var(--muted); padding: 6px 0; font-size: 11px; display: flex; flex-direction: column; align-items: center; gap: 2px; position: relative; }
+  .nav button .ic { font-size: 20px; transition: transform .2s; }
+  .nav button.on { color: var(--gold); }
+  .nav button.on .ic { transform: translateY(-3px) scale(1.15); }
+  .nav button .now { position: absolute; top: 2px; right: 22%; width: 7px; height: 7px; border-radius: 50%; background: var(--red); }
+
+  /* 효과 */
+  .fx { position: fixed; pointer-events: none; z-index: 60; }
+  .spark { width: 8px; height: 8px; border-radius: 2px; background: var(--gold-2); animation: spark .7s ease-out forwards; }
+  @keyframes spark { to { transform: translate(var(--x), var(--y)) rotate(200deg) scale(.2); opacity: 0; } }
+  .float { font-family: var(--pixel); font-weight: 700; font-size: 16px; color: var(--gold-2); text-shadow: 0 2px 0 #6b4510, 0 0 8px #000; animation: floatUp 1s ease-out forwards; transform: translate(-50%, -50%); white-space: nowrap; }
+  .float.dmg { color: #ff6b6b; text-shadow: 0 2px 0 #5a1010, 0 0 8px #000; font-size: 20px; }
+  .float.combo { color: #fff; background: var(--red); padding: 2px 8px; border-radius: 6px; text-shadow: none; font-size: 12px; }
+  @keyframes floatUp { to { transform: translate(-50%, -150%); opacity: 0; } }
+  .orb { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle, #fff, var(--gold)); box-shadow: 0 0 12px 4px #f5c04acc; }
+
+  /* 모달 */
+  .modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: #05030acc; backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: opacity .3s; }
+  .modal.show { opacity: 1; pointer-events: auto; }
+  .modal-box { width: 100%; max-width: 360px; text-align: center; position: relative; transform: scale(.8); transition: transform .4s cubic-bezier(.2,1.6,.5,1); }
+  .modal.show .modal-box { transform: scale(1); }
+  .modal-box.sheet { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 20px; }
+  .rays { position: absolute; left: 50%; top: 130px; width: 520px; height: 520px; margin: -260px 0 0 -260px; background: repeating-conic-gradient(#f5c04a33 0 10deg, transparent 10deg 20deg); border-radius: 50%; mask-image: radial-gradient(circle, #000 20%, transparent 65%); -webkit-mask-image: radial-gradient(circle, #000 20%, transparent 65%); animation: spin 14s linear infinite; pointer-events: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .modal .portrait { width: 160px; height: 160px; margin: 40px auto 0; position: relative; }
+  .big-lv { font-family: var(--display); font-size: 52px; line-height: 1.1; margin-top: 16px; }
+  .big-lv em { font-style: italic; color: var(--gold); font-family: var(--pixel); }
+  .confetti { position: fixed; top: -10px; width: 8px; height: 12px; z-index: 55; pointer-events: none; animation: confetti var(--d) ease-in forwards; }
+  @keyframes confetti { to { transform: translate(var(--x), 105vh) rotate(720deg); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+  @media (max-width: 360px) {
+    .hero { height: 380px; }
+    .portrait { width: 112px; height: 112px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ===================== 히어로 ===================== -->
+  <header class="hero">
+    <div class="scene phase-night" id="scene">
+      <svg class="bg" viewBox="0 0 400 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+        <defs>
+          <linearGradient id="gM" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2a5e"/><stop offset=".55" stop-color="#c9637a"/><stop offset="1" stop-color="#ffb06b"/></linearGradient>
+          <linearGradient id="gD" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d8fd6"/><stop offset="1" stop-color="#cdeefa"/></linearGradient>
+          <linearGradient id="gN" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#070616"/><stop offset=".6" stop-color="#211a4d"/><stop offset="1" stop-color="#4a2f5e"/></linearGradient>
+        </defs>
+        <rect class="sky sky-m" width="400" height="400" fill="url(#gM)"/>
+        <rect class="sky sky-d" width="400" height="400" fill="url(#gD)"/>
+        <rect class="sky sky-n" width="400" height="400" fill="url(#gN)"/>
+        <g class="stars" id="stars"></g>
+        <circle class="sun" cx="320" cy="96" r="26"/>
+        <g class="moon"><circle cx="320" cy="96" r="22" fill="#fff4d6"/><circle cx="330" cy="88" r="20" fill="#14102e" opacity=".9"/></g>
+        <path class="m1" d="M0 250 L50 205 L95 235 L150 180 L210 230 L265 195 L320 225 L370 190 L400 210 V400 H0Z"/>
+        <path class="m2" d="M0 285 Q60 245 120 270 T240 262 T400 255 V400 H0Z"/>
+        <!-- 성 -->
+        <g class="castle-g">
+          <rect class="castle" x="262" y="208" width="18" height="70"/><path class="castle" d="M258 210 L271 180 L284 210Z"/>
+          <rect class="castle" x="282" y="225" width="44" height="55"/>
+          <rect class="castle" x="296" y="186" width="16" height="45"/><path class="castle" d="M292 188 L304 154 L316 188Z"/>
+          <rect class="castle" x="326" y="215" width="16" height="64"/><path class="castle" d="M322 217 L334 190 L346 217Z"/>
+          <rect class="win" x="268" y="222" width="5" height="8" rx="2"/><rect class="win" x="301" y="200" width="5" height="8" rx="2"/>
+          <rect class="win" x="290" y="240" width="5" height="8" rx="2"/><rect class="win" x="312" y="240" width="5" height="8" rx="2"/>
+          <rect class="win" x="331" y="230" width="5" height="8" rx="2"/><path class="win" d="M298 280 V266 Q304 258 310 266 V280Z"/>
+        </g>
+        <path class="hill" d="M0 300 Q80 270 160 292 T320 286 T400 280 V400 H0Z"/>
+        <g>
+          <path class="tree" d="M30 300 L42 262 L54 300Z"/><path class="tree" d="M48 302 L62 252 L76 302Z"/>
+          <path class="tree" d="M360 296 L372 258 L384 296Z"/><path class="tree" d="M378 300 L388 270 L398 300Z"/>
+          <path class="tree" d="M120 298 L128 276 L136 298Z"/>
+        </g>
+      </svg>
+      <div class="clouds" id="clouds"></div>
+      <div class="lanterns" id="lanterns"></div>
+      <div class="precip" id="precip"></div>
+    </div>
+
+    <div class="hero-top">
+      <span class="chip" id="dateChip"></span>
+      <div class="row">
+        <span class="chip" id="weatherChip">☁️ …</span>
+        <button class="icon-btn" id="settingsBtn" aria-label="설정">⚙️</button>
+      </div>
+    </div>
+
+    <div class="hero-center">
+      <div class="portrait-wrap" id="heroAvatar" title="눌러 보세요">
+        <div class="bubble" id="bubble"></div>
+        <div class="portrait" id="portrait"></div>
+        <div class="lv-badge" id="lvBadge">1</div>
+      </div>
+      <div class="hero-name"><span id="stageName">견습</span> <em>모험가</em></div>
+      <div class="hero-sub pix" id="xpText">0 / 100 XP</div>
+      <div class="xpbar" id="xpBar"><i style="width:0%"></i></div>
+      <span class="chip streak" id="streakChip">🔥 <b>0</b>일 연속</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- 주간 보스 -->
+    <section class="card boss" id="bossCard">
+      <div class="boss-art" id="bossArt"></div>
+      <div class="boss-info">
+        <div class="pix muted" style="font-size:10px">WEEKLY BOSS · <span id="bossDday"></span></div>
+        <div class="boss-name" id="bossName"></div>
+        <div class="hpbar"><i id="bossHp" style="width:100%"></i></div>
+        <div class="muted" id="bossText" style="font-size:12px"></div>
+      </div>
+    </section>
+
+    <!-- 아침 -->
+    <section id="tab-morning" class="hidden">
+      <div class="card stack">
+        <span class="eyebrow">MORNING</span>
+        <h2>오늘의 퀘스트 받기</h2>
+        <div id="tomorrowNote" class="notice hidden"></div>
+        <label class="muted" for="goalInput">오늘 집중하고 싶은 것 (선택)</label>
+        <input id="goalInput" placeholder="예: 토익 공부, 방 정리, 운동 습관">
+        <div class="muted">난이도</div>
+        <div class="seg" id="diffSeg">
+          <button data-d="easy">🌱 쉬움</button>
+          <button data-d="normal">⚔️ 보통</button>
+          <button data-d="hard">🔥 어려움</button>
+        </div>
+        <div id="diffHint" class="notice hidden"></div>
+        <button class="btn btn-primary" id="genBtn">📜 오늘의 퀘스트 받기</button>
+        <div class="muted" id="genSource"></div>
+      </div>
+      <div class="card hidden" id="morningPreview">
+        <h2>오늘 받은 퀘스트</h2>
+        <div id="morningList"></div>
+      </div>
+    </section>
+
+    <!-- 낮 -->
+    <section id="tab-day" class="hidden">
+      <div class="card">
+        <div class="row between">
+          <div><span class="eyebrow">IN PROGRESS</span><h2 style="margin:0">진행 중인 퀘스트</h2></div>
+          <span class="pix" id="progressText" style="color:var(--gold)">0/0</span>
+        </div>
+        <div class="bar" style="margin:10px 0 4px"><i id="progressBar" style="width:0%"></i></div>
+        <p class="muted" id="todayXp" style="margin:0 0 12px"></p>
+        <div id="questList"></div>
+        <div id="emptyDay" class="muted hidden" style="text-align:center;padding:20px 0">아직 퀘스트가 없어요.<br>아침 탭에서 받아 보세요.</div>
+      </div>
+    </section>
+
+    <!-- 밤 -->
+    <section id="tab-night" class="hidden">
+      <div class="card stack" style="text-align:center">
+        <span class="eyebrow">NIGHT</span>
+        <h2>오늘의 보상 상자</h2>
+        <div class="chest-wrap"><svg class="chest" id="chest" viewBox="0 0 150 120" aria-label="보상 상자">
+          <ellipse class="glow" cx="75" cy="56" rx="60" ry="34" fill="#ffd25a" opacity=".5"/>
+          <ellipse cx="75" cy="112" rx="56" ry="6" fill="#0006"/>
+          <rect x="22" y="58" width="106" height="52" rx="6" fill="#8a4f24" stroke="#4a2810" stroke-width="3"/>
+          <rect x="22" y="58" width="106" height="10" fill="#6b3a18"/>
+          <rect x="40" y="58" width="10" height="52" fill="#d9a531"/><rect x="100" y="58" width="10" height="52" fill="#d9a531"/>
+          <g class="lid">
+            <path d="M22 60 V44 Q22 22 75 22 Q128 22 128 44 V60Z" fill="#a8622d" stroke="#4a2810" stroke-width="3"/>
+            <rect x="40" y="25" width="10" height="35" fill="#f5c04a"/><rect x="100" y="25" width="10" height="35" fill="#f5c04a"/>
+          </g>
+          <rect x="66" y="52" width="18" height="22" rx="3" fill="#f5c04a" stroke="#8a5d17" stroke-width="2"/>
+          <circle cx="75" cy="61" r="3" fill="#4a2810"/>
+        </svg></div>
+        <div class="stats">
+          <div class="stat"><b id="nDone">0</b><span class="muted">완료</span></div>
+          <div class="stat"><b id="nRate">0%</b><span class="muted">달성률</span></div>
+          <div class="stat"><b id="nXp">0</b><span class="muted">XP</span></div>
+        </div>
+        <div id="bonusInfo" class="muted"></div>
+        <button class="btn btn-primary" id="claimBtn">🎁 보상 상자 열기</button>
+      </div>
+      <div class="card stack">
+        <h2>내일 목표 정하기</h2>
+        <input id="tomorrowInput" placeholder="내일 꼭 하고 싶은 한 가지">
+        <button class="btn btn-ghost" id="saveTomorrowBtn">📌 내일 목표 저장</button>
+      </div>
+    </section>
+
+    <!-- 리포트 -->
+    <section id="tab-report" class="hidden">
+      <div class="card">
+        <span class="eyebrow">EVOLUTION</span>
+        <h2>캐릭터 성장</h2>
+        <div class="evo" id="evo"></div>
+      </div>
+      <div class="card">
+        <h2>최근 7일</h2>
+        <div class="bars" id="weekBars"></div>
+      </div>
+      <div class="card">
+        <div class="stats">
+          <div class="stat"><b id="wDone">0</b><span class="muted">완료 퀘스트</span></div>
+          <div class="stat"><b id="wRate">0%</b><span class="muted">평균 달성률</span></div>
+          <div class="stat"><b id="wXp">0</b><span class="muted">얻은 XP</span></div>
+        </div>
+      </div>
+      <div class="card stack">
+        <h2>분야별 완료</h2>
+        <div id="catList"></div>
+      </div>
+      <div class="card stack">
+        <h2>이번 주 한 줄 평</h2>
+        <p id="weekComment" class="muted" style="margin:0">버튼을 누르면 이번 주 기록으로 코멘트를 만들어요.</p>
+        <button class="btn btn-ghost" id="commentBtn">✨ 코멘트 만들기</button>
+      </div>
+    </section>
+  </main>
+
+  <nav class="nav" id="nav">
+    <button data-tab="morning"><span class="ic">🌅</span>아침</button>
+    <button data-tab="day"><span class="ic">⚔️</span>퀘스트</button>
+    <button data-tab="night"><span class="ic">🌙</span>밤</button>
+    <button data-tab="report"><span class="ic">📊</span>리포트</button>
+  </nav>
+</div>
+
+<div class="modal" id="modal"><div class="modal-box" id="modalBox"></div></div>
+
+<script>
+/* =========================================================
+   API 레이어 — 프론트엔드가 부르는 함수는 이 세 개뿐이에요.
+   실서비스에서는 이 객체 안쪽만 백엔드(프록시) 호출로 바꾸면 돼요.
+   ========================================================= */
+const api = {
+  // 날씨: Open-Meteo (무료, 키 없음)
+  async getWeather(lat, lon) {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('weather ' + res.status);
+    const { current } = await res.json();
+    return { temp: Math.round(current.temperature_2m), code: current.weather_code, kind: weatherKind(current.weather_code) };
+  },
+
+  // 퀘스트 추천: Gemini (무료 티어) → 실패하면 로컬 규칙으로 대체
+  async generateQuests({ goal, difficulty, weather, history }) {
+    const key = state.settings.apiKey;
+    if (!key) return { source: 'local', quests: localQuests({ goal, difficulty, weather }) };
+    const prompt = `너는 일상을 게임 퀘스트로 바꿔 주는 코치야.
+조건:
+- 오늘 퀘스트 4개를 한국어로 만든다. 각 퀘스트는 30분 안에 끝낼 수 있는 구체적인 행동 하나.
+- 난이도 기본값: ${difficulty} (easy/normal/hard). 4개 중 1개는 한 단계 쉬운 것으로 섞는다.
+- 오늘 집중 목표: ${goal || '없음'} → 최소 2개는 이 목표와 연결한다.
+- 날씨: ${weather ? weather.kind + ', ' + weather.temp + '도' : '모름'} → 비/눈이면 실내 활동으로.
+- 최근 자주 완료한 분야: ${history.topCats.join(', ') || '없음'}, 자주 못 한 분야: ${history.weakCats.join(', ') || '없음'}
+- category는 health, study, tidy, mind, social 중 하나.
+JSON 배열만 출력: [{"title":"...","category":"...","difficulty":"easy|normal|hard"}]`;
+    try {
+      const text = await gemini(prompt, true);
+      const arr = JSON.parse(text);
+      const quests = arr.slice(0, 5).map(q => makeQuest(q.title, q.category, q.difficulty));
+      if (!quests.length) throw new Error('empty');
+      return { source: 'ai', quests };
+    } catch (e) {
+      console.warn('AI 실패, 기본 퀘스트로 대체', e);
+      return { source: 'local-fallback', quests: localQuests({ goal, difficulty, weather }) };
+    }
+  },
+
+  // 주간 리포트 코멘트: Gemini → 실패하면 규칙 기반 문장
+  async weeklyComment(summary) {
+    if (state.settings.apiKey) {
+      try {
+        return await gemini(`다음은 사용자의 지난 7일 퀘스트 기록이야. 칭찬 1문장 + 다음 주 제안 1문장, 총 2문장으로 따뜻하게 한국어로 써 줘.\n${JSON.stringify(summary)}`, false);
+      } catch (e) { console.warn(e); }
+    }
+    const best = summary.categories[0];
+    if (!summary.done) return '이번 주는 기록이 없어요. 내일은 쉬운 퀘스트 하나로 다시 시작해 봐요.';
+    return `이번 주 ${summary.done}개 퀘스트를 끝냈어요${best ? `, 특히 '${CATS[best.cat].name}' 분야가 강했어요` : ''}. ` +
+      (summary.rate >= 80 ? '다음 주는 난이도를 한 단계 올려 봐도 좋아요.' : summary.rate >= 50 ? '지금 페이스를 유지해 봐요.' : '다음 주는 쉬운 퀘스트로 연속 기록부터 쌓아 봐요.');
+  },
+};
+
+async function gemini(prompt, asJson) {
+  const model = state.settings.model || 'gemini-2.5-flash';
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': state.settings.apiKey },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.9, ...(asJson ? { responseMimeType: 'application/json' } : {}) },
+    }),
+  });
+  if (!res.ok) throw new Error('gemini ' + res.status);
+  const data = await res.json();
+  return data.candidates[0].content.parts.map(p => p.text).join('').trim();
+}
+
+/* ========================= 데이터 ========================= */
+const CATS = {
+  health: { name: '건강', icon: '💪' },
+  study:  { name: '공부', icon: '📚' },
+  tidy:   { name: '정리', icon: '🧹' },
+  mind:   { name: '마음', icon: '🧘' },
+  social: { name: '관계', icon: '💬' },
+};
+const XP = { easy: 10, normal: 20, hard: 35 };
+const DIFF_NAME = { easy: '쉬움', normal: '보통', hard: '어려움' };
+const POOL = {
+  health: { easy: ['물 한 컵 마시기', '스트레칭 3분'], normal: ['15분 산책하기', '계단으로 5층 오르기'], hard: ['30분 운동하기', '스쿼트 50개'] },
+  study:  { easy: ['관심 분야 글 하나 읽기', '단어 10개 외우기'], normal: ['25분 집중 공부 1번', '강의 1개 듣고 3줄 요약'], hard: ['25분 집중 공부 2번', '배운 내용으로 글 하나 쓰기'] },
+  tidy:   { easy: ['책상 위 5개 치우기', '메일함 10개 정리'], normal: ['서랍 하나 정리하기', '휴대폰 사진 30장 정리'], hard: ['방 한 구역 대청소', '안 쓰는 물건 5개 처분'] },
+  mind:   { easy: ['심호흡 1분', '오늘 감사한 일 1개 적기'], normal: ['10분 명상', '휴대폰 없이 20분 보내기'], hard: ['일기 한 쪽 쓰기', 'SNS 없이 반나절 보내기'] },
+  social: { easy: ['친구에게 안부 메시지', '가족에게 고맙다고 말하기'], normal: ['오랜만인 사람에게 연락', '동료 칭찬 한마디'], hard: ['친구와 약속 잡기', '가족과 30분 대화'] },
+};
+const INDOOR = ['실내 스트레칭 10분', '홈트 영상 하나 따라 하기'];
+const OUTDOOR = ['햇볕 쬐며 15분 걷기', '가까운 공원 한 바퀴'];
+
+// 캐릭터 진화 단계 (레벨 기준)
+const STAGES = [
+  { lv: 1,  name: '견습',   title: '모험가' },
+  { lv: 3,  name: '떠돌이', title: '전사' },
+  { lv: 5,  name: '숙련',   title: '기사' },
+  { lv: 8,  name: '왕국의', title: '수호자' },
+  { lv: 12, name: '전설의', title: '영웅' },
+];
+const stageOf = lv => STAGES.reduce((s, x, i) => lv >= x.lv ? i : s, 0);
+
+// 주간 보스 (매주 바뀜) — 퀘스트 XP만큼 피해
+const BOSSES = [
+  { name: '게으름 슬라임', line: '내일 해도 되잖아…' },
+  { name: '미루기 유령',   line: '5분만 더 쉬자~' },
+  { name: '알림 골렘',     line: '띠링! 새 알림 99+' },
+];
+
+const SPEECH = ['오늘도 한 걸음!', '퀘스트 가자!', '보스 잡으러 가자!', '조금만 더 힘내!', '연속 기록 지키자 🔥', '물 한 잔 어때?'];
+
+const KEY = 'dailyQuest_v1';
+let state = load();
+let weather = null;
+let tab = nowTab();
+let dealNext = false;
+const modalQueue = [];
+const pending = new Set(); // XP 구슬이 날아가는 중인 퀘스트
+
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && s.profile) return s;
+  } catch (e) {}
+  return { profile: { xp: 0, level: 1, streak: 0, lastDoneDate: null, difficulty: 'normal', combo: { n: 0, t: 0 } }, days: {}, boss: null, settings: { apiKey: '', model: '' } };
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const today = () => ymd(new Date());
+const addDays = (s, n) => { const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + n); return ymd(d); };
+const day = (k = today()) => state.days[k] || (state.days[k] = { quests: [], claimed: false, tomorrowGoal: '' });
+const weekStart = () => { const d = new Date(); return addDays(today(), -((d.getDay() + 6) % 7)); };
+
+function makeQuest(title, category, difficulty) {
+  const cat = CATS[category] ? category : 'mind';
+  const diff = XP[difficulty] ? difficulty : 'normal';
+  return { id: Math.random().toString(36).slice(2, 9), title, category: cat, difficulty: diff, xp: XP[diff], done: false };
+}
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const easier = d => d === 'hard' ? 'normal' : 'easy';
+
+function localQuests({ goal, difficulty, weather }) {
+  const cats = Object.keys(CATS).sort(() => Math.random() - 0.5).slice(0, 3);
+  const qs = cats.map((c, i) => {
+    const d = i === 2 ? easier(difficulty) : difficulty;
+    let title = pick(POOL[c][d]);
+    if (c === 'health' && weather) title = pick(weather.kind === '맑음' || weather.kind === '흐림' ? OUTDOOR : INDOOR);
+    return makeQuest(title, c, d);
+  });
+  if (goal) qs.unshift(makeQuest(`'${goal}' 25분 집중하기`, 'study', difficulty));
+  else qs.push(makeQuest(pick(POOL.mind.easy), 'mind', 'easy'));
+  return qs;
+}
+
+function weatherKind(c) {
+  if (c === 0) return '맑음';
+  if (c <= 3 || c === 45 || c === 48) return '흐림';
+  if (c >= 71 && c <= 77 || c === 85 || c === 86) return '눈';
+  return '비';
+}
+const WICON = { '맑음': '☀️', '흐림': '☁️', '비': '🌧️', '눈': '❄️' };
+
+/* ========================= 일러스트 (SVG) ========================= */
+function avatarSVG(stage) {
+  const tunic = ['#6f8f52', '#4f7c92', '#8b5a36', '#4a5f9a', '#c9962a'][stage];
+  const pad = ['', '#9a6b45', '#b9c1d0', '#c9d2e3', '#f5c04a'][stage];
+  const cape = stage >= 3 ? `<path d="M18 100 L28 70 L72 70 L82 100Z" fill="${stage === 4 ? '#b3242d' : '#3557b8'}"/>` : '';
+  const sword = stage >= 2 ? `<g transform="rotate(28 78 62)"><rect x="76" y="34" width="5" height="40" rx="1" fill="#dde3ee"/><rect x="71" y="62" width="15" height="4" rx="1" fill="#6b3e22"/><rect x="76" y="66" width="5" height="8" fill="#4a2810"/></g>` : '';
+  const pads = stage >= 1 ? `<ellipse cx="29" cy="81" rx="10" ry="6" fill="${pad}"/><ellipse cx="71" cy="81" rx="10" ry="6" fill="${pad}"/>` : '';
+  const chest = stage >= 2 ? `<path d="M38 78 Q50 74 62 78 L60 100 H40Z" fill="${pad}" opacity=".9"/>` : '';
+  const band = stage === 1 ? `<rect x="30" y="33" width="40" height="5" rx="2" fill="#d64545"/><path d="M68 35 L78 31 L76 39Z" fill="#d64545"/>` : '';
+  const helm = stage === 3 ? `<path d="M30 38 Q30 20 50 20 Q70 20 70 38 L66 34 Q50 28 34 34Z" fill="#c9d2e3" stroke="#8a93a8" stroke-width="1.5"/><rect x="48" y="14" width="4" height="10" rx="2" fill="#d64545"/>` : '';
+  const crown = stage === 4 ? `<path d="M35 30 L38 15 L45 24 L50 11 L55 24 L62 15 L65 30Z" fill="#f5c04a" stroke="#a5741c" stroke-width="1.5"/><circle cx="50" cy="24" r="2.4" fill="#e5484d"/>` : '';
+  return `<svg viewBox="0 0 100 100" aria-hidden="true">
+    ${cape}${sword}
+    <path d="M20 100 Q22 74 50 72 Q78 74 80 100Z" fill="${tunic}"/>
+    ${chest}${pads}
+    <rect x="44" y="60" width="12" height="13" rx="3" fill="#e2ad85"/>
+    <circle cx="31" cy="48" r="4" fill="#f0bf98"/><circle cx="69" cy="48" r="4" fill="#f0bf98"/>
+    <circle cx="50" cy="46" r="20" fill="#f6caa2"/>
+    <path d="M29 45 Q27 22 50 22 Q74 22 71 45 Q67 34 61 37 Q57 30 50 35 Q44 29 39 37 Q33 33 29 45Z" fill="#6b3e22"/>
+    ${band}${helm}${crown}
+    <ellipse cx="42" cy="48" rx="2.6" ry="3.3" fill="#2b1a12"/><ellipse cx="58" cy="48" rx="2.6" ry="3.3" fill="#2b1a12"/>
+    <circle cx="43" cy="47" r=".9" fill="#fff"/><circle cx="59" cy="47" r=".9" fill="#fff"/>
+    <ellipse cx="37" cy="55" rx="3.5" ry="2" fill="#f08a7a" opacity=".55"/><ellipse cx="63" cy="55" rx="3.5" ry="2" fill="#f08a7a" opacity=".55"/>
+    <path d="M45 56 Q50 61 55 56" stroke="#7a3b2a" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function bossSVG(i) {
+  if (i === 0) return `<svg viewBox="0 0 100 100" aria-hidden="true">
+    <path d="M12 88 Q6 54 28 42 Q40 18 56 30 Q90 34 88 88Z" fill="#5cc775" stroke="#2f7a43" stroke-width="3"/>
+    <ellipse cx="40" cy="44" rx="7" ry="4" fill="#ffffff55"/>
+    <path d="M32 62 Q38 66 44 62 M56 62 Q62 66 68 62" stroke="#1d4a2a" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <ellipse cx="50" cy="74" rx="5" ry="4" fill="#1d4a2a"/><path d="M54 76 Q56 84 53 86" stroke="#bfefff" stroke-width="2" fill="none"/>
+    <text x="72" y="30" fill="#e6fff0" font-family="Silkscreen,monospace" font-size="12">Zz</text></svg>`;
+  if (i === 1) return `<svg viewBox="0 0 100 100" aria-hidden="true">
+    <path d="M22 92 V46 Q22 12 50 12 Q78 12 78 46 V92 L69 84 L59 92 L50 84 L41 92 L31 84Z" fill="#cfc8ff" stroke="#6d5bd0" stroke-width="3"/>
+    <ellipse cx="40" cy="42" rx="5" ry="7" fill="#2a2150"/><ellipse cx="60" cy="42" rx="5" ry="7" fill="#2a2150"/>
+    <path d="M43 56 Q50 52 57 56" stroke="#2a2150" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <circle cx="50" cy="72" r="10" fill="#fff" stroke="#6d5bd0" stroke-width="2"/><path d="M50 72 V65 M50 72 L56 75" stroke="#6d5bd0" stroke-width="2" stroke-linecap="round"/></svg>`;
+  return `<svg viewBox="0 0 100 100" aria-hidden="true">
+    <rect x="10" y="50" width="14" height="30" rx="6" fill="#3b3f58"/><rect x="76" y="50" width="14" height="30" rx="6" fill="#3b3f58"/>
+    <rect x="24" y="10" width="52" height="82" rx="10" fill="#3b3f58" stroke="#8b93c9" stroke-width="3"/>
+    <rect x="30" y="20" width="40" height="58" rx="4" fill="#3a6df0"/>
+    <path d="M36 38 L46 42 M64 38 L54 42" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="42" cy="47" r="3.5" fill="#ff4d5e"/><circle cx="58" cy="47" r="3.5" fill="#ff4d5e"/>
+    <path d="M40 64 Q50 58 60 64" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <circle cx="72" cy="16" r="10" fill="#e5484d"/><text x="72" y="20" text-anchor="middle" fill="#fff" font-family="Silkscreen,monospace" font-size="9">99</text></svg>`;
+}
+
+/* ========================= 규칙 ========================= */
+const needXp = lv => 100 + (lv - 1) * 50;
+function gainXp(n) {
+  const p = state.profile; const before = p.level;
+  p.xp += n;
+  while (p.xp >= needXp(p.level)) { p.xp -= needXp(p.level); p.level++; }
+  while (p.xp < 0 && p.level > 1) { p.level--; p.xp += needXp(p.level); }
+  if (p.xp < 0) p.xp = 0;
+  if (p.level > before) queueModal(() => levelUpHTML(before, p.level));
+}
+
+// 연속 기록: 하루에 1개 이상 완료하면 이어짐. 어제를 건너뛰었으면 0으로.
+function checkStreak() {
+  const p = state.profile;
+  if (p.lastDoneDate && p.lastDoneDate < addDays(today(), -1)) p.streak = 0;
+}
+function markDoneToday() {
+  const p = state.profile;
+  if (p.lastDoneDate === today()) return;
+  p.streak = p.lastDoneDate === addDays(today(), -1) ? p.streak + 1 : 1;
+  p.lastDoneDate = today();
+}
+
+// 콤보: 30분 안에 연달아 완료하면 XP 배율 +10% (최대 1.5배)
+function nextCombo() {
+  const c = state.profile.combo || (state.profile.combo = { n: 0, t: 0 });
+  c.n = Date.now() - c.t < 30 * 60 * 1000 ? c.n + 1 : 1;
+  c.t = Date.now();
+  return { n: c.n, mult: Math.min(1.5, 1 + 0.1 * (c.n - 1)) };
+}
+
+function ensureBoss() {
+  const w = weekStart();
+  if (state.boss && state.boss.week === w) return state.boss;
+  const idx = Math.floor(new Date(w).getTime() / 6048e5) % BOSSES.length;
+  const max = 300 + (state.profile.level - 1) * 25;
+  return state.boss = { week: w, idx, hp: max, max, defeated: false };
+}
+
+const rateOf = d => d && d.quests.length ? d.quests.filter(q => q.done).length / d.quests.length : null;
+
+// 난이도 자동 조절 제안: 최근 3일 달성률 기준
+function diffSuggestion() {
+  const rates = [1, 2, 3].map(i => rateOf(state.days[addDays(today(), -i)])).filter(r => r !== null);
+  if (rates.length < 2) return null;
+  const avg = rates.reduce((a, b) => a + b, 0) / rates.length;
+  const cur = state.profile.difficulty;
+  if (avg >= 0.9 && cur !== 'hard') return { to: cur === 'easy' ? 'normal' : 'hard', msg: `최근 ${rates.length}일 달성률 ${Math.round(avg * 100)}% — 한 단계 올려 볼까요?` };
+  if (avg < 0.5 && cur !== 'easy') return { to: easier(cur), msg: `최근 ${rates.length}일 달성률 ${Math.round(avg * 100)}% — 조금 쉽게 가 볼까요?` };
+  return null;
+}
+
+function weekSummary() {
+  let done = 0, total = 0, xp = 0; const cat = {}; const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const k = addDays(today(), -i); const d = state.days[k];
+    const qs = d ? d.quests : [];
+    const dn = qs.filter(q => q.done);
+    done += dn.length; total += qs.length; xp += dn.reduce((a, q) => a + (q.gained || q.xp), 0);
+    dn.forEach(q => cat[q.category] = (cat[q.category] || 0) + 1);
+    days.push({ date: k, rate: qs.length ? dn.length / qs.length : 0 });
+  }
+  const categories = Object.entries(cat).map(([c, n]) => ({ cat: c, count: n })).sort((a, b) => b.count - a.count);
+  return { done, total, xp, rate: total ? Math.round(done / total * 100) : 0, categories, days };
+}
+function history() {
+  const s = weekSummary();
+  const top = s.categories.slice(0, 2).map(c => CATS[c.cat].name);
+  const weak = Object.keys(CATS).filter(c => !s.categories.find(x => x.cat === c)).map(c => CATS[c].name);
+  return { topCats: top, weakCats: weak };
+}
+const bonusOf = d => { const r = rateOf(d); return r === 1 ? 30 : r >= 0.5 ? 10 : 0; };
+
+/* ========================= 화면 ========================= */
+const $ = id => document.getElementById(id);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function nowTab() { const h = new Date().getHours(); return h < 11 ? 'morning' : h < 19 ? 'day' : 'night'; }
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function questHTML(q, interactive) {
+  const d = day();
+  return `<div class="quest ${q.done ? 'done' : ''}" data-d="${q.difficulty}">
+    <div class="q-icon">${CATS[q.category].icon}</div>
+    <div class="q-body">
+      <div class="q-title">${escapeHtml(q.title)}</div>
+      <div class="q-meta"><span class="tag">${CATS[q.category].name}</span><span class="tag d">${DIFF_NAME[q.difficulty]}</span><span class="tag xp">+${q.gained || q.xp}XP</span></div>
+    </div>
+    ${interactive && !q.done && !d.claimed ? `<button class="q-swap" data-swap="${q.id}" title="다른 퀘스트로 바꾸기" aria-label="다른 퀘스트로 바꾸기">↻</button>` : ''}
+    ${interactive ? `<button class="check" data-id="${q.id}" aria-label="${q.done ? '완료 취소' : '완료'}">${q.done ? '✓' : '⚔'}</button>` : ''}
+  </div>`;
+}
+
+let lastStage = -1;
+function render() {
+  const p = state.profile; const d = day(); const boss = ensureBoss();
+  const now = new Date();
+  const stage = stageOf(p.level);
+
+  // 장면: 선택한 탭의 시간대로 바뀜 (리포트는 지금 시간대)
+  const phase = tab === 'report' ? nowTab() : tab;
+  $('scene').className = 'scene phase-' + phase;
+
+  $('dateChip').textContent = `${now.getMonth() + 1}.${now.getDate()} ${'일월화수목금토'[now.getDay()]}`;
+  if (weather) $('weatherChip').textContent = `${WICON[weather.kind]} ${weather.temp}°`;
+  if (stage !== lastStage) { $('portrait').innerHTML = avatarSVG(stage); lastStage = stage; }
+  $('heroAvatar').className = 'portrait-wrap stage-' + stage;
+  $('lvBadge').textContent = p.level;
+  $('stageName').textContent = STAGES[stage].name;
+  document.querySelector('.hero-name em').textContent = STAGES[stage].title;
+  $('xpText').textContent = `${p.xp} / ${needXp(p.level)} XP`;
+  $('xpBar').firstElementChild.style.width = (p.xp / needXp(p.level) * 100) + '%';
+  $('streakChip').innerHTML = `🔥 <b>${p.streak}</b>일 연속`;
+
+  // 보스
+  $('bossArt').innerHTML = bossSVG(boss.idx);
+  $('bossName').textContent = BOSSES[boss.idx].name;
+  $('bossHp').style.width = (boss.hp / boss.max * 100) + '%';
+  $('bossCard').classList.toggle('defeated', boss.defeated);
+  const left = 7 - Math.round((new Date(today()) - new Date(boss.week)) / 864e5);
+  $('bossDday').textContent = `D-${left - 1 < 0 ? 0 : left - 1}`;
+  $('bossText').textContent = boss.defeated ? '🏆 이번 주 보스 처치 완료!' : `HP ${boss.hp} / ${boss.max} · 퀘스트를 끝내면 XP만큼 피해`;
+
+  // 하단 탭
+  document.querySelectorAll('#nav button').forEach(b => {
+    b.classList.toggle('on', b.dataset.tab === tab);
+    let dot = b.querySelector('.now');
+    if (b.dataset.tab === nowTab() && !dot) b.insertAdjacentHTML('beforeend', '<i class="now" title="지금 시간대"></i>');
+  });
+  ['morning', 'day', 'night', 'report'].forEach(t => $('tab-' + t).classList.toggle('hidden', t !== tab));
+
+  // 아침
+  const yGoal = (state.days[addDays(today(), -1)] || {}).tomorrowGoal;
+  $('tomorrowNote').classList.toggle('hidden', !yGoal);
+  if (yGoal) $('tomorrowNote').textContent = `📌 어제 정한 목표: ${yGoal}`;
+  if (yGoal && !$('goalInput').value && !d.quests.length) $('goalInput').value = yGoal;
+  document.querySelectorAll('#diffSeg button').forEach(b => b.classList.toggle('on', b.dataset.d === p.difficulty));
+  const sug = diffSuggestion();
+  $('diffHint').classList.toggle('hidden', !sug);
+  $('diffHint').innerHTML = sug ? `💡 ${sug.msg} <a href="#" id="applySug">${DIFF_NAME[sug.to]}으로 바꾸기</a>` : '';
+  const locked = d.quests.some(q => q.done) || d.claimed;
+  $('genBtn').disabled = locked;
+  $('genBtn').textContent = d.quests.length ? '🔄 퀘스트 다시 받기' : '📜 오늘의 퀘스트 받기';
+  if (locked) $('genSource').textContent = '이미 진행 중인 퀘스트가 있어요. 퀘스트 탭에서 이어 가세요!';
+  $('morningPreview').classList.toggle('hidden', !d.quests.length);
+  $('morningList').innerHTML = d.quests.map(q => questHTML(q, false)).join('');
+
+  // 낮
+  const done = d.quests.filter(q => q.done);
+  const xpToday = done.reduce((a, q) => a + (q.gained || q.xp), 0);
+  $('progressText').textContent = `${done.length}/${d.quests.length}`;
+  $('progressBar').style.width = (d.quests.length ? done.length / d.quests.length * 100 : 0) + '%';
+  $('todayXp').textContent = `오늘 얻은 경험치 ${xpToday} XP`;
+  $('questList').classList.toggle('deal', dealNext);
+  $('questList').innerHTML = d.quests.map(q => questHTML(q, true)).join('');
+  $('morningList').parentElement.classList.toggle('deal', dealNext);
+  dealNext = false;
+  $('emptyDay').classList.toggle('hidden', d.quests.length > 0);
+
+  // 밤
+  const rate = d.quests.length ? Math.round(done.length / d.quests.length * 100) : 0;
+  $('nDone').textContent = done.length; $('nRate').textContent = rate + '%'; $('nXp').textContent = xpToday;
+  const bonus = bonusOf(d);
+  $('bonusInfo').textContent = d.claimed ? `상자를 열었어요 (+${d.bonus || 0} XP). 내일 봐요!` :
+    !done.length ? '퀘스트를 1개 이상 끝내면 상자를 열 수 있어요.' : `전부 완료 +30 XP · 절반 이상 +10 XP — 지금 열면 +${bonus} XP`;
+  $('claimBtn').disabled = d.claimed || !done.length;
+  $('claimBtn').textContent = d.claimed ? '✅ 오늘 보상 받음' : '🎁 보상 상자 열기';
+  $('chest').classList.toggle('open', !!d.claimed);
+  $('chest').classList.toggle('locked', !d.claimed && !done.length);
+  if (document.activeElement !== $('tomorrowInput')) $('tomorrowInput').value = d.tomorrowGoal || '';
+
+  // 리포트
+  $('evo').innerHTML = STAGES.map((s, i) => `<div class="${i === stage ? 'cur' : i > stage ? 'lock' : ''}"><div class="mini">${avatarSVG(i)}</div><span>${i > stage ? '?' : s.title}<br>LV.${s.lv}</span></div>`).join('');
+  const s = weekSummary();
+  $('weekBars').innerHTML = s.days.map((x, i) => `<div class="col ${i === 6 ? 'today' : ''}"><i style="height:${Math.max(3, x.rate * 100)}%"></i><span>${'일월화수목금토'[new Date(x.date + 'T00:00:00').getDay()]}</span></div>`).join('');
+  $('wDone').textContent = s.done; $('wRate').textContent = s.rate + '%'; $('wXp').textContent = s.xp;
+  const max = Math.max(1, ...s.categories.map(c => c.count));
+  $('catList').innerHTML = Object.keys(CATS).map(c => {
+    const n = (s.categories.find(x => x.cat === c) || { count: 0 }).count;
+    return `<div><div class="row between"><span>${CATS[c].icon} ${CATS[c].name}</span><span class="muted">${n}개</span></div><div class="bar"><i style="width:${n / max * 100}%"></i></div></div>`;
+  }).join('');
+}
+
+/* ========================= 효과 ========================= */
+function center(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+function fx(cls, x, y, html, life = 1000) {
+  const e = document.createElement('div'); e.className = 'fx ' + cls;
+  e.style.left = x + 'px'; e.style.top = y + 'px'; if (html) e.innerHTML = html;
+  document.body.appendChild(e); setTimeout(() => e.remove(), life); return e;
+}
+function burst(x, y, colors = ['#ffe08a', '#f5c04a', '#fff', '#ff9a3d']) {
+  if (reduced) return;
+  for (let i = 0; i < 14; i++) {
+    const a = Math.PI * 2 * i / 14 + Math.random() * .3, r = 40 + Math.random() * 40;
+    const e = fx('spark', x - 4, y - 4, '', 800);
+    e.style.setProperty('--x', Math.cos(a) * r + 'px'); e.style.setProperty('--y', Math.sin(a) * r + 'px');
+    e.style.background = pick(colors);
+  }
+}
+function flyOrb(x, y, done) {
+  const bar = $('xpBar'); const t = center(bar);
+  if (reduced || bar.getBoundingClientRect().bottom < 0) return done();
+  const o = fx('orb', x - 7, y - 7, '', 2000);
+  o.animate([
+    { transform: 'translate(0,0) scale(1)' },
+    { transform: `translate(${(t.x - x) * .4}px, ${(t.y - y) * .2 - 80}px) scale(1.4)`, offset: .4 },
+    { transform: `translate(${t.x - x}px, ${t.y - y}px) scale(.6)` },
+  ], { duration: 750, easing: 'cubic-bezier(.5,0,.6,1)' }).onfinish = () => { o.remove(); bar.classList.remove('pulse'); void bar.offsetWidth; bar.classList.add('pulse'); done(); };
+}
+function confetti() {
+  if (reduced) return;
+  const colors = ['#f5c04a', '#ffe08a', '#ff7aa2', '#6cb6ff', '#5fd38d', '#fff'];
+  for (let i = 0; i < 60; i++) {
+    const e = document.createElement('div'); e.className = 'confetti';
+    e.style.left = Math.random() * 100 + 'vw'; e.style.background = pick(colors);
+    e.style.setProperty('--d', 1.6 + Math.random() * 1.6 + 's'); e.style.setProperty('--x', (Math.random() - .5) * 200 + 'px');
+    e.style.animationDelay = Math.random() * .4 + 's';
+    document.body.appendChild(e); setTimeout(() => e.remove(), 3800);
+  }
+}
+function say(text) {
+  const b = $('bubble'); b.textContent = text; b.classList.add('show');
+  clearTimeout(say.t); say.t = setTimeout(() => b.classList.remove('show'), 1800);
+}
+function jump() { const a = $('heroAvatar'); a.classList.remove('jump'); void a.offsetWidth; a.classList.add('jump'); }
+
+/* ========================= 모달 ========================= */
+function queueModal(fn, delay = 650) { modalQueue.push(fn); if (!$('modal').classList.contains('show')) setTimeout(nextModal, delay); }
+function nextModal() {
+  const fn = modalQueue.shift();
+  if (!fn) return $('modal').classList.remove('show');
+  const html = fn(); if (!html) return nextModal();
+  $('modalBox').className = 'modal-box' + (html.sheet ? ' sheet' : '');
+  $('modalBox').innerHTML = html.html || html;
+  $('modal').classList.add('show');
+  if (!html.sheet) confetti();
+}
+function levelUpHTML(from, to) {
+  const evolved = stageOf(to) > stageOf(from); const st = STAGES[stageOf(to)];
+  return `<div class="rays"></div>
+    <div class="portrait">${avatarSVG(stageOf(to))}</div>
+    <div class="pix" style="color:var(--gold);margin-top:16px;font-size:12px">${evolved ? 'EVOLUTION!' : 'LEVEL UP'}</div>
+    <div class="big-lv">Level <em>${to}</em></div>
+    <div class="muted pix" style="font-size:11px;margin-top:4px">${st.name} ${st.title}</div>
+    ${evolved ? `<p style="margin:8px 0 0">새 모습으로 진화했어요! 🎉</p>` : ''}
+    <button class="btn btn-primary" data-close style="margin-top:20px">계속하기 →</button>`;
+}
+function bossDownHTML(idx) {
+  return `<div class="rays"></div>
+    <div style="width:140px;height:140px;margin:40px auto 0;filter:grayscale(.6);transform:rotate(-12deg)">${bossSVG(idx)}</div>
+    <div class="pix" style="color:var(--gold);margin-top:16px;font-size:12px">BOSS DEFEATED</div>
+    <div class="big-lv" style="font-size:34px">${BOSSES[idx].name}<br>처치!</div>
+    <p class="muted">전리품: 보너스 <b style="color:var(--gold)">+50 XP</b></p>
+    <button class="btn btn-primary" data-close style="margin-top:12px">전리품 받기 →</button>`;
+}
+function settingsHTML() {
+  return { sheet: true, html: `
+    <h2>설정 · AI 연결 (선택)</h2>
+    <div class="stack">
+      <div class="notice">키가 없어도 기본 퀘스트로 모두 동작해요. Gemini 키를 넣으면 AI 맞춤 퀘스트로 바뀌어요. 키는 이 브라우저에만 저장돼요.</div>
+      <label class="muted" for="keyInput">Gemini API 키 (Google AI Studio 무료 발급)</label>
+      <input id="keyInput" type="password" placeholder="AIza..." value="${escapeHtml(state.settings.apiKey)}">
+      <label class="muted" for="modelInput">모델 이름</label>
+      <input id="modelInput" placeholder="gemini-2.5-flash" value="${escapeHtml(state.settings.model)}">
+      <button class="btn btn-ghost" id="saveKeyBtn">저장</button>
+      <div class="row"><button class="btn btn-ghost" id="demoBtn">7일 샘플 데이터</button><button class="btn btn-ghost" id="lvDemoBtn">+150 XP 체험</button></div>
+      <button class="btn btn-ghost" id="resetBtn" style="color:#ff8a8a">모든 기록 초기화</button>
+      <button class="btn btn-ghost" data-close>닫기</button>
+    </div>` };
+}
+
+/* ========================= 이벤트 ========================= */
+$('nav').onclick = e => { const b = e.target.closest('button'); if (b) { tab = b.dataset.tab; render(); scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' }); } };
+$('diffSeg').onclick = e => { const b = e.target.closest('button'); if (b) { state.profile.difficulty = b.dataset.d; save(); render(); } };
+$('diffHint').onclick = e => { if (e.target.id === 'applySug') { e.preventDefault(); state.profile.difficulty = diffSuggestion().to; save(); render(); } };
+$('heroAvatar').onclick = () => { jump(); say(pick(SPEECH)); const c = center($('portrait')); burst(c.x, c.y - 40, ['#fff', '#ffe08a']); };
+$('bossArt').onclick = () => {
+  const b = ensureBoss(); const a = $('bossArt'); const c = center(a);
+  if (b.defeated) return fx('float', c.x, c.y - 30, '💤', 1000);
+  a.classList.remove('hit'); void a.offsetWidth; a.classList.add('hit');
+  fx('float', c.x, c.y - 40, `"${BOSSES[b.idx].line}"`, 1000).style.fontSize = '12px';
+};
+
+$('genBtn').onclick = async () => {
+  const btn = $('genBtn'); btn.disabled = true; btn.textContent = '🔮 퀘스트 소환 중…';
+  const { source, quests } = await api.generateQuests({ goal: $('goalInput').value.trim(), difficulty: state.profile.difficulty, weather, history: history() });
+  day().quests = quests; save();
+  $('genSource').textContent = { ai: '✨ AI가 만든 맞춤 퀘스트예요.', local: '기본 퀘스트예요. 설정(⚙️)에서 AI를 연결하면 맞춤 퀘스트를 받을 수 있어요.', 'local-fallback': 'AI 연결에 실패해서 기본 퀘스트를 보여 드려요.' }[source];
+  dealNext = true; render(); jump(); say('새 퀘스트 도착! 📜');
+};
+
+$('questList').onclick = e => {
+  const d = day();
+  const c = e.target.closest('[data-id]');
+  if (c) {
+    if (d.claimed) return say('오늘 보상은 이미 받았어요');
+    const q = d.quests.find(x => x.id === c.dataset.id);
+    if (pending.has(q.id)) return;
+    const pos = center(c); const boss = ensureBoss();
+    q.done = !q.done;
+    if (q.done) {
+      const combo = nextCombo();
+      q.gained = Math.round(q.xp * combo.mult);
+      markDoneToday();
+      burst(pos.x, pos.y);
+      fx('float', pos.x, pos.y - 20, `+${q.gained} XP`);
+      if (combo.n > 1) setTimeout(() => fx('float combo', pos.x, pos.y - 46, `COMBO x${combo.n}`), 150);
+      save(); render(); pending.add(q.id);
+      flyOrb(pos.x, pos.y, () => {
+        pending.delete(q.id);
+        gainXp(q.gained);
+        if (!boss.defeated) {
+          boss.hp = Math.max(0, boss.hp - q.gained);
+          const a = $('bossArt'); const bc = center(a);
+          a.classList.remove('hit'); void a.offsetWidth; a.classList.add('hit');
+          fx('float dmg', bc.x, bc.y - 20, `-${q.gained}`);
+          if (boss.hp === 0) { boss.defeated = true; gainXp(50); queueModal(() => bossDownHTML(boss.idx)); }
+        }
+        jump(); save(); render();
+      });
+    } else {
+      gainXp(-(q.gained || q.xp));
+      if (!boss.defeated) boss.hp = Math.min(boss.max, boss.hp + (q.gained || q.xp));
+      delete q.gained;
+      save(); render();
+    }
+    return;
+  }
+  const s = e.target.closest('[data-swap]');
+  if (s) {
+    const i = d.quests.findIndex(x => x.id === s.dataset.swap); const old = d.quests[i];
+    d.quests[i] = makeQuest(pick(POOL[old.category][old.difficulty].filter(t => t !== old.title)) || old.title, old.category, old.difficulty);
+    save(); render();
+  }
+};
+
+function claim() {
+  const d = day();
+  if (d.claimed || !d.quests.some(q => q.done)) return;
+  const b = bonusOf(d); const c = center($('chest'));
+  d.claimed = true; d.bonus = b; save(); render();
+  burst(c.x, c.y - 20); setTimeout(() => burst(c.x, c.y - 40, ['#fff', '#ffe08a', '#6cb6ff']), 200);
+  fx('float', c.x, c.y - 50, b ? `+${b} XP` : '수고했어요!', 1200);
+  if (b) setTimeout(() => flyOrb(c.x, c.y - 30, () => { gainXp(b); save(); render(); }), 300);
+}
+$('claimBtn').onclick = claim;
+$('chest').onclick = claim;
+$('saveTomorrowBtn').onclick = () => { day().tomorrowGoal = $('tomorrowInput').value.trim(); save(); say('내일 목표 저장! 📌'); };
+
+$('commentBtn').onclick = async () => {
+  $('weekComment').textContent = '작성 중…';
+  $('weekComment').textContent = await api.weeklyComment(weekSummary());
+};
+
+$('settingsBtn').onclick = () => queueModal(settingsHTML, 0);
+$('modal').onclick = e => {
+  const t = e.target;
+  if (t.closest('[data-close]') || t === $('modal')) return nextModal();
+  if (t.id === 'saveKeyBtn') { state.settings.apiKey = $('keyInput').value.trim(); state.settings.model = $('modelInput').value.trim(); save(); t.textContent = '저장했어요 ✓'; }
+  if (t.id === 'resetBtn' && confirm('모든 기록을 지울까요?')) { localStorage.removeItem(KEY); state = load(); lastStage = -1; nextModal(); render(); }
+  if (t.id === 'lvDemoBtn') { nextModal(); gainXp(150); save(); render(); }
+  if (t.id === 'demoBtn') {
+    for (let i = 1; i <= 6; i++) {
+      const k = addDays(today(), -i);
+      const qs = localQuests({ difficulty: 'normal', weather });
+      qs.forEach(q => q.done = Math.random() < 0.75);
+      state.days[k] = { quests: qs, claimed: true, tomorrowGoal: '' };
+    }
+    state.profile.streak = 6; state.profile.lastDoneDate = addDays(today(), -1);
+    save(); nextModal(); render(); say('샘플 데이터 완료!');
+  }
+};
+
+/* ========================= 장면 만들기 ========================= */
+function buildScene() {
+  $('stars').innerHTML = Array.from({ length: 40 }, () =>
+    `<circle cx="${Math.random() * 400}" cy="${Math.random() * 200}" r="${Math.random() * 1.3 + .3}" fill="#fff" style="--tw:${2 + Math.random() * 3}s;animation-delay:${Math.random() * 3}s"/>`).join('');
+  $('lanterns').innerHTML = Array.from({ length: 14 }, () =>
+    `<span class="lantern" style="left:${Math.random() * 100}%;--d:${14 + Math.random() * 12}s;--delay:-${Math.random() * 24}s;--s:${.6 + Math.random() * .7}"></span>`).join('');
+  $('clouds').innerHTML = [[40, 34], [110, 46], [70, 28]].map(([top, d], i) =>
+    `<span class="cloud" style="top:${top}px;--d:${d}s;animation-delay:-${i * 12}s;transform:scale(${.6 + i * .2})"></span>`).join('');
+}
+function buildPrecip() {
+  if (!weather || reduced) return;
+  if (weather.kind === '비') $('precip').innerHTML = Array.from({ length: 50 }, () => `<span class="drop" style="left:${Math.random() * 110}%;--d:${.5 + Math.random() * .4}s;--delay:-${Math.random()}s"></span>`).join('');
+  if (weather.kind === '눈') $('precip').innerHTML = Array.from({ length: 36 }, () => `<span class="flake" style="left:${Math.random() * 110}%;--d:${4 + Math.random() * 4}s;--delay:-${Math.random() * 8}s"></span>`).join('');
+}
+
+/* ========================= 시작 ========================= */
+buildScene();
+checkStreak(); ensureBoss(); save(); render();
+setTimeout(() => say(pick(['좋은 하루!', '오늘도 모험 시작!', '퀘스트 가자!'])), 600);
+
+function loadWeather(lat, lon) {
+  api.getWeather(lat, lon).then(w => { weather = w; buildPrecip(); render(); })
+    .catch(() => { $('weatherChip').textContent = '날씨 없음'; });
+}
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(p => loadWeather(p.coords.latitude, p.coords.longitude), () => loadWeather(37.5665, 126.978), { timeout: 5000 });
+} else loadWeather(37.5665, 126.978); // 기본: 서울
+</script>
+</body>
+</html>
