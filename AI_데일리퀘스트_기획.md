@@ -12,7 +12,7 @@
 
 | 용도 | API | 비용 | 키 | 비고 |
 |---|---|---|---|---|
-| 퀘스트 추천 · 주간 코멘트 | **Google Gemini API** (`gemini-2.5-flash`) | 무료 티어 있음 | 필요 (Google AI Studio에서 발급) | 분당/일일 요청 수 제한 있음. 한도는 AI Studio에서 확인 |
+| 퀘스트 추천 · 주간 코멘트 | **Google Gemini API** (`gemini-2.5-flash`) | 무료 티어 있음 | 필요 (Google AI Studio에서 발급, 서버 `.env`의 `GEMINI_API_KEY`) | 분당/일일 요청 수 제한 있음. 한도는 AI Studio에서 확인 |
 | 날씨 개인화 | **Open-Meteo** | 무료 | **필요 없음** | 비상업용 무료. 상업 서비스면 유료 플랜 확인 |
 | 공휴일 | **Nager.Date** (`/api/v3/PublicHolidays/{년}/KR`) | 무료 | **필요 없음** | 한국 기준. 연 1회 받아 `localStorage`에 캐시. 실패하면 평소 난이도 |
 | 위치 | 브라우저 Geolocation | 무료 | 없음 | 거부하면 서울 좌표로 대체 |
@@ -94,7 +94,8 @@
   quests: [{ id, title, category: "health|study|tidy|mind|social",
              difficulty: "easy|normal|hard", xp, done: false }] }
 ```
-- 내부: `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`
+- 내부: `POST /api/quests` (server.py) → 서버가 프롬프트를 만들어 `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent` 호출
+  - 키는 서버 `.env`에만 있음. 서버에 키가 없으면 503 → 브라우저는 기본 퀘스트로 대체
   - 헤더 `x-goog-api-key: <키>`, `generationConfig.responseMimeType = "application/json"`
   - 응답 `candidates[0].content.parts[0].text` 를 JSON 파싱
 
@@ -117,8 +118,7 @@
 
 ## 5. 실서비스 전 꼭 바꿀 것
 
-1. **API 키를 브라우저에 두지 않는다.** 프로토타입은 사용자가 자기 키를 넣는 방식이라 괜찮지만, 서비스 키를 프론트에 넣으면 누구나 가져다 쓸 수 있다.
-   → 무료로 하려면 **Cloudflare Workers**(무료 플랜) 같은 서버리스 함수 하나를 프록시로 두고, `api.generateQuests`가 그 주소를 부르게 바꾼다.
+1. ~~API 키를 브라우저에 두지 않는다.~~ → **완료**: Gemini 호출을 `server.py`의 `/api/quests`, `/api/comment`로 옮겼다. 키는 서버 `.env`(`GEMINI_API_KEY`)에만 있고, 프롬프트도 서버에서 만들어 브라우저가 키를 다른 용도로 쓸 수 없다.
 2. 여러 기기 동기화가 필요하면 `localStorage` → Supabase/Firebase 무료 플랜으로 교체 (명세의 저장 구조 그대로 사용 가능).
 3. 아침/밤 알림은 웹에서는 PWA 푸시가 필요 → 2단계 범위로 둔다.
 
@@ -129,4 +129,4 @@
 1. `index.html`을 브라우저로 연다.
 2. 오른쪽 위 ⚙️ → **7일 샘플 데이터**를 누르면 리포트·연속 기록·난이도 제안을 바로 볼 수 있다. **+150 XP 체험**을 누르면 레벨업·진화 화면을 볼 수 있다.
 3. 아침 탭 → 퀘스트 받기 → 퀘스트 탭에서 ⚔ 체크 → 밤 탭에서 보상 상자 열기.
-4. (선택) https://aistudio.google.com 에서 무료 키 발급 → 설정에 넣으면 AI 맞춤 퀘스트로 바뀐다.
+4. (선택) https://aistudio.google.com 에서 무료 키 발급 → `.env`에 `GEMINI_API_KEY=...` 추가 후 `python server.py`로 실행하면 AI 맞춤 퀘스트로 바뀐다.
