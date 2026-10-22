@@ -296,6 +296,7 @@
     <div class="hero-top">
       <span class="chip" id="dateChip"></span>
       <div class="row">
+        <span class="chip hidden" id="holidayChip"></span>
         <span class="chip" id="weatherChip">☁️ …</span>
         <button class="icon-btn" id="settingsBtn" aria-label="설정">⚙️</button>
       </div>
@@ -458,6 +459,21 @@ const api = {
     }
   },
 
+  // 공휴일: Nager.Date (무료, 키 없음). 한국(KR) 연간 목록을 받아 오늘이 있는지 확인. 연 단위로 localStorage에 캐시
+  async getHoliday(date) {
+    const year = date.slice(0, 4), cacheKey = `holidays_KR_${year}`;
+    let list = null;
+    try { list = JSON.parse(localStorage.getItem(cacheKey)); } catch (e) { /* 캐시 없음 */ }
+    if (!list) {
+      const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/KR`);
+      if (!res.ok) throw new Error('holiday ' + res.status);
+      list = (await res.json()).map(h => ({ date: h.date, name: h.name, localName: h.localName }));
+      try { localStorage.setItem(cacheKey, JSON.stringify(list)); } catch (e) { /* 저장 실패는 무시 */ }
+    }
+    const h = list.find(x => x.date === date);
+    return h ? { name: h.name, localName: h.localName } : null;
+  },
+
   // 퀘스트 추천: Gemini (무료 티어) → 실패하면 로컬 규칙으로 대체
   async generateQuests({ goal, difficulty, weather, history }) {
     const key = state.settings.apiKey;
@@ -554,6 +570,7 @@ const SPEECH = ['오늘도 한 걸음!', '퀘스트 가자!', '보스 잡으러 
 const KEY = 'dailyQuest_v1';
 let state = load();
 let weather = null;
+let holiday = null; // 오늘이 한국 공휴일이면 { name, localName }
 let tab = nowTab();
 let dealNext = false;
 const modalQueue = [];
@@ -757,6 +774,8 @@ function render() {
 
   $('dateChip').textContent = `${now.getMonth() + 1}.${now.getDate()} ${'일월화수목금토'[now.getDay()]}`;
   if (weather) $('weatherChip').textContent = `${WICON[weather.kind]} ${weather.temp}°`;
+  $('holidayChip').classList.toggle('hidden', !holiday);
+  if (holiday) $('holidayChip').textContent = `🎌 ${holiday.localName}`;
   if (stage !== lastStage) { $('portrait').innerHTML = avatarSVG(stage); lastStage = stage; }
   $('heroAvatar').className = 'portrait-wrap stage-' + stage;
   $('lvBadge').textContent = p.level;
@@ -937,9 +956,12 @@ $('bossArt').onclick = () => {
 
 $('genBtn').onclick = async () => {
   const btn = $('genBtn'); btn.disabled = true; btn.textContent = '🔮 퀘스트 소환 중…';
-  const { source, quests } = await api.generateQuests({ goal: $('goalInput').value.trim(), difficulty: state.profile.difficulty, weather, history: history() });
+  // 공휴일에는 설정한 난이도보다 한 단계 여유 있게 (설정값 자체는 바꾸지 않음)
+  const difficulty = holiday ? easier(state.profile.difficulty) : state.profile.difficulty;
+  const { source, quests } = await api.generateQuests({ goal: $('goalInput').value.trim(), difficulty, weather, history: history() });
   day().quests = quests; save();
-  $('genSource').textContent = { ai: '✨ AI가 만든 맞춤 퀘스트예요.', local: '기본 퀘스트예요. 설정(⚙️)에서 AI를 연결하면 맞춤 퀘스트를 받을 수 있어요.', 'local-fallback': 'AI 연결에 실패해서 기본 퀘스트를 보여 드려요.' }[source];
+  $('genSource').textContent = { ai: '✨ AI가 만든 맞춤 퀘스트예요.', local: '기본 퀘스트예요. 설정(⚙️)에서 AI를 연결하면 맞춤 퀘스트를 받을 수 있어요.', 'local-fallback': 'AI 연결에 실패해서 기본 퀘스트를 보여 드려요.' }[source]
+    + (holiday ? ` 🎌 ${holiday.localName}이라 난이도를 한 단계 여유 있게 맞췄어요.` : '');
   dealNext = true; render(); jump(); say('새 퀘스트 도착! 📜');
 };
 
@@ -1044,6 +1066,9 @@ function buildPrecip() {
 buildScene();
 checkStreak(); ensureBoss(); save(); render();
 setTimeout(() => say(pick(['좋은 하루!', '오늘도 모험 시작!', '퀘스트 가자!'])), 600);
+
+api.getHoliday(today()).then(h => { holiday = h; render(); })
+  .catch(e => console.warn('공휴일 확인 실패, 평소 난이도로 진행', e));
 
 function loadWeather(lat, lon) {
   api.getWeather(lat, lon).then(w => { weather = w; buildPrecip(); render(); })
