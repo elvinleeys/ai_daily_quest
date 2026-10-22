@@ -443,13 +443,19 @@
    실서비스에서는 이 객체 안쪽만 백엔드(프록시) 호출로 바꾸면 돼요.
    ========================================================= */
 const api = {
-  // 날씨: Open-Meteo (무료, 키 없음)
+  // 날씨: 기상청 단기예보 (server.js 프록시 경유, 키는 .env)
   async getWeather(lat, lon) {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('weather ' + res.status);
-    const { current } = await res.json();
-    return { temp: Math.round(current.temperature_2m), code: current.weather_code, kind: weatherKind(current.weather_code) };
+    try {
+      const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
+      if (!res.ok) throw new Error('weather ' + res.status);
+      return await res.json(); // { temp, kind: '맑음'|'흐림'|'비'|'눈' }
+    } catch (e) { // 서버 미실행(file:// 등)·키 오류 시 Open-Meteo(키 없음)로 대체
+      console.warn('기상청 연동 실패, Open-Meteo로 대체', e);
+      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`);
+      if (!res.ok) throw new Error('weather ' + res.status);
+      const { current } = await res.json();
+      return { temp: Math.round(current.temperature_2m), kind: weatherKind(current.weather_code) };
+    }
   },
 
   // 퀘스트 추천: Gemini (무료 티어) → 실패하면 로컬 규칙으로 대체
@@ -596,7 +602,7 @@ function weatherKind(c) {
   if (c >= 71 && c <= 77 || c === 85 || c === 86) return '눈';
   return '비';
 }
-const WICON = { '맑음': '☀️', '흐림': '☁️', '비': '🌧️', '눈': '❄️' };
+const WICON ={ '맑음': '☀️', '흐림': '☁️', '비': '🌧️', '눈': '❄️' };
 
 /* ========================= 일러스트 (SVG) ========================= */
 function avatarSVG(stage) {
