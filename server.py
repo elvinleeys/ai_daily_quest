@@ -1,4 +1,4 @@
-"""정적 파일 + 기상청 단기예보 프록시 + Supabase 상태 저장 (표준 라이브러리만 사용). 실행: python server.py"""
+"""정적 파일 + 기상청 단기예보 프록시 + Supabase 상태 저장 API(/api/state) (표준 라이브러리만 사용). 실행: python server.py"""
 import json
 import math
 import os
@@ -29,19 +29,6 @@ PORT = int(os.environ.get('PORT', 3000))
 SB_URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
 SB_KEY = os.environ.get('SUPABASE_SERVICE_KEY')  # 서버에서만 사용 (RLS 우회) — 브라우저에 절대 내보내지 않기
 MAX_STATE = 1_000_000
-
-# index.html은 수정하지 않고, 내려줄 때 localStorage 저장을 Supabase와 동기화하는 스크립트를 끼워 넣는다.
-# 초기 상태(REMOTE)를 localStorage에 먼저 써 두면 index.html의 동기 load()가 그대로 읽는다.
-# settings(Gemini 키 등)는 DB로 보내지 않고 브라우저에 남긴다.
-SHIM = """<script>(function(){var K='dailyQuest_v1',R=__REMOTE__,t;try{
-function sync(v){clearTimeout(t);t=setTimeout(function(){try{var d=JSON.parse(v);delete d.settings;
-fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d),keepalive:true})}catch(e){}},500)}
-var l=localStorage.getItem(K);
-if(R){var o=l&&JSON.parse(l);R.settings=(o&&o.settings)||{apiKey:'',model:''};localStorage.setItem(K,JSON.stringify(R))}
-else if(l)sync(l);
-var s=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){s.call(this,k,v);if(k===K)sync(v)}
-}catch(e){}})()</script>"""
-
 
 def sb(method, path, body=None, headers=None):
     req = urllib.request.Request(
@@ -165,17 +152,18 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 print(e)
                 self.send(502, json.dumps({'error': str(e)}, ensure_ascii=False).encode())
+        elif url.path == '/api/state':
+            if not (SB_URL and SB_KEY):
+                return self.send(503, b'{"error":"SUPABASE_URL/SUPABASE_SERVICE_KEY not set"}')
+            uid, _ = self.uid()
+            try:
+                self.send(200, json.dumps({'data': get_state(uid)}).encode())
+            except Exception as e:
+                print('supabase 읽기 실패:', e)
+                self.send(502)
         elif url.path in ('/', '/index.html'):
-            html = (ROOT / 'index.html').read_text(encoding='utf-8')
             uid, new = self.uid()
-            if SB_URL and SB_KEY:
-                try:
-                    remote = json.dumps(get_state(uid)).replace('</', '<\\/')
-                except Exception as e:  # Supabase 장애 시 localStorage만으로 동작
-                    print('supabase 읽기 실패:', e)
-                    remote = 'null'
-                html = html.replace('</head>', SHIM.replace('__REMOTE__', remote) + '</head>', 1)
-            self.send(200, html.encode(), 'text/html; charset=utf-8', uid if new else None)
+            self.send(200, (ROOT / 'index.html').read_bytes(), 'text/html; charset=utf-8', uid if new else None)
         else:
             self.send(404)
 

@@ -505,6 +505,23 @@
    실서비스에서는 이 객체 안쪽만 백엔드(프록시) 호출로 바꾸면 돼요.
    ========================================================= */
 const api = {
+  // 저장 상태: server.py → Supabase. 서버에 없으면 예전 localStorage 기록을 한 번 이전한다.
+  async loadState() {
+    const res = await fetch('/api/state');
+    if (!res.ok) throw new Error('state ' + res.status);
+    const { data } = await res.json();
+    if (data) return data;
+    try {
+      const old = JSON.parse(localStorage.getItem(LEGACY_KEY));
+      if (old && old.profile) { delete old.settings; return old; }
+    } catch (e) {}
+    return null;
+  },
+  async saveState(data) {
+    const res = await fetch('/api/state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), keepalive: true });
+    if (!res.ok) throw new Error('state ' + res.status);
+  },
+
   // 날씨: 기상청 단기예보 (server.js 프록시 경유, 키는 .env)
   async getWeather(lat, lon) {
     try {
@@ -628,8 +645,11 @@ const BOSSES = [
 
 const SPEECH = ['오늘도 한 걸음!', '퀘스트 가자!', '보스 잡으러 가자!', '조금만 더 힘내!', '연속 기록 지키자 🔥', '물 한 잔 어때?'];
 
-const KEY = 'dailyQuest_v1';
-let state = load();
+const LEGACY_KEY = 'dailyQuest_v1';       // 예전 localStorage 저장본 (최초 1회 서버로 이전)
+const SETTINGS_KEY = 'dailyQuest_settings'; // Gemini 키는 DB로 보내지 않고 이 브라우저에만 둔다
+let state = defaultState();
+let ready = false; // 서버에서 상태를 읽어 오기 전/실패 시에는 저장하지 않는다 (기본값이 기존 기록을 덮어쓰지 않게)
+let saveTimer = 0;
 let weather = null;
 let holiday = null; // 오늘이 한국 공휴일이면 { name, localName }
 let tab = nowTab();
@@ -637,14 +657,24 @@ let dealNext = false;
 const modalQueue = [];
 const pending = new Set(); // XP 구슬이 날아가는 중인 퀘스트
 
-function load() {
-  try {
-    const s = JSON.parse(localStorage.getItem(KEY));
-    if (s && s.profile) return s;
-  } catch (e) {}
-  return { profile: { xp: 0, level: 1, streak: 0, lastDoneDate: null, difficulty: 'normal', combo: { n: 0, t: 0 } }, days: {}, boss: null, settings: { apiKey: '', model: '' } };
+function defaultState() {
+  let settings = { apiKey: '', model: '' };
+  try { settings = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || settings; } catch (e) {}
+  return { profile: { xp: 0, level: 1, streak: 0, lastDoneDate: null, difficulty: 'normal', combo: { n: 0, t: 0 } }, days: {}, boss: null, settings };
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+// 저장은 0.4초 모아서 서버(Supabase)로 한 번에 보낸다. 탭을 닫을 때는 즉시 보낸다.
+function save() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch (e) {}
+  if (!ready) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flush, 400);
+}
+function flush() {
+  saveTimer = 0;
+  const { settings, ...data } = state;
+  api.saveState(data).catch(e => console.warn('서버 저장 실패', e));
+}
+addEventListener('pagehide', () => { if (saveTimer) { clearTimeout(saveTimer); flush(); } });
 
 const pad = n => String(n).padStart(2, '0');
 const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -1094,7 +1124,7 @@ $('modal').onclick = e => {
   const t = e.target;
   if (t.closest('[data-close]') || t === $('modal')) return nextModal();
   if (t.id === 'saveKeyBtn') { state.settings.apiKey = $('keyInput').value.trim(); state.settings.model = $('modelInput').value.trim(); save(); t.textContent = '저장했어요 ✓'; }
-  if (t.id === 'resetBtn' && confirm('모든 기록을 지울까요?')) { localStorage.removeItem(KEY); state = load(); lastStage = -1; nextModal(); render(); }
+  if (t.id === 'resetBtn' && confirm('모든 기록을 지울까요?')) { state = defaultState(); lastStage = -1; save(); nextModal(); render(); }
   if (t.id === 'lvDemoBtn') { nextModal(); gainXp(150); save(); render(); }
   if (t.id === 'demoBtn') {
     for (let i = 1; i <= 6; i++) {
@@ -1124,20 +1154,32 @@ function buildPrecip() {
 }
 
 /* ========================= 시작 ========================= */
-buildScene();
-checkStreak(); ensureBoss(); save(); render();
-setTimeout(() => say(pick(['좋은 하루!', '오늘도 모험 시작!', '퀘스트 가자!'])), 600);
-
-api.getHoliday(today()).then(h => { holiday = h; render(); })
-  .catch(e => console.warn('공휴일 확인 실패, 평소 난이도로 진행', e));
-
 function loadWeather(lat, lon) {
   api.getWeather(lat, lon).then(w => { weather = w; buildPrecip(); render(); })
     .catch(() => { $('weatherChip').textContent = '날씨 없음'; });
 }
-if (navigator.geolocation) {
-  navigator.geolocation.getCurrentPosition(p => loadWeather(p.coords.latitude, p.coords.longitude), () => loadWeather(37.5665, 126.978), { timeout: 5000 });
-} else loadWeather(37.5665, 126.978); // 기본: 서울
+
+async function start() {
+  let hello = pick(['좋은 하루!', '오늘도 모험 시작!', '퀘스트 가자!']);
+  try {
+    const s = await api.loadState();
+    if (s) { s.settings = state.settings; state = s; }
+    ready = true;
+  } catch (e) {
+    console.error('서버 상태 불러오기 실패', e);
+    hello = '서버에 연결할 수 없어 저장되지 않아요 ⚠️';
+  }
+  buildScene();
+  checkStreak(); ensureBoss(); save(); render();
+  setTimeout(() => say(hello), 600);
+
+  api.getHoliday(today()).then(h => { holiday = h; render(); })
+    .catch(e => console.warn('공휴일 확인 실패, 평소 난이도로 진행', e));
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(p => loadWeather(p.coords.latitude, p.coords.longitude), () => loadWeather(37.5665, 126.978), { timeout: 5000 });
+  } else loadWeather(37.5665, 126.978); // 기본: 서울
+}
+start();
 </script>
 </body>
 </html>
